@@ -20,6 +20,9 @@ def affine_forward(x, w, b):
   - cache: (x, w, b)
   """
   out = None
+  xSize = x.shape
+  tempx = np.reshape(x,(xSize[0],np.prod(xSize)/xSize[0]))
+  out = np.dot(tempx, w) + b 
   #############################################################################
   # TODO: Implement the affine forward pass. Store the result in out. You     #
   # will need to reshape the input into rows.                                 #
@@ -48,7 +51,13 @@ def affine_backward(dout, cache):
   - db: Gradient with respect to b, of shape (M,)
   """
   x, w, b = cache
+  xSize = x.shape
+  tempx = np.reshape(x,(xSize[0],np.prod(xSize)/xSize[0]))
   dx, dw, db = None, None, None
+  dw = np.dot(tempx.T, dout)
+  db = np.sum(dout, axis=0, keepdims=True)
+  dx = np.dot(dout,w.T )
+  dx = np.reshape(dx,xSize)
   #############################################################################
   # TODO: Implement the affine backward pass.                                 #
   #############################################################################
@@ -71,6 +80,7 @@ def relu_forward(x):
   - cache: x
   """
   out = None
+  out = np.maximum(0,x)
   #############################################################################
   # TODO: Implement the ReLU forward pass.                                    #
   #############################################################################
@@ -94,6 +104,8 @@ def relu_backward(dout, cache):
   - dx: Gradient with respect to x
   """
   dx, x = None, cache
+  dx = dout
+  dx[x <= 0] = 0
   #############################################################################
   # TODO: Implement the ReLU backward pass.                                   #
   #############################################################################

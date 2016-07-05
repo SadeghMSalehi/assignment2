@@ -36,6 +36,10 @@ class TwoLayerNet(object):
     """
     self.params = {}
     self.reg = reg
+    self.params['W1'] = weight_scale * np.random.randn(input_dim,hidden_dim)
+    self.params['b1'] = np.zeros((1,hidden_dim))
+    self.params['W2'] = weight_scale * np.random.randn(hidden_dim,num_classes)
+    self.params['b2'] = np.zeros((1,num_classes))
     
     ############################################################################
     # TODO: Initialize the weights and biases of the two-layer net. Weights    #
@@ -70,7 +74,15 @@ class TwoLayerNet(object):
     - grads: Dictionary with the same keys as self.params, mapping parameter
       names to gradients of the loss with respect to those parameters.
     """  
+    
     scores = None
+    W1, b1 = self.params['W1'], self.params['b1']
+    W2, b2 = self.params['W2'], self.params['b2']
+    
+    out1, cache_afrel_l1 = affine_relu_forward(X, W1, b1)
+    
+    scores, cache_aff_l2 = affine_forward(out1, W2, b2)
+    
     ############################################################################
     # TODO: Implement the forward pass for the two-layer net, computing the    #
     # class scores for X and storing them in the scores variable.              #
@@ -84,7 +96,18 @@ class TwoLayerNet(object):
     if y is None:
       return scores
     
-    loss, grads = 0, {}
+    loss, dx = softmax_loss(scores, y)
+    loss += 0.5 * self.reg * np.sum(W1 * W1) + 0.5 * self.reg * np.sum(W2 * W2)
+    grads = {}
+    
+    # backprop:
+    dout1, dW2, db2 = affine_backward(dx, cache_aff_l2)
+    dX, dW1, db1 = affine_relu_backward(dout1, cache_afrel_l1)
+    
+    grads['b1'] = db1
+    grads['W1'] = dW1 + self.reg *W1
+    grads['b2'] = db2
+    grads['W2'] = dW2 + self.reg *W2
     ############################################################################
     # TODO: Implement the backward pass for the two-layer net. Store the loss  #
     # in the loss variable and gradients in the grads dictionary. Compute data #
@@ -148,7 +171,23 @@ class FullyConnectedNet(object):
     self.num_layers = 1 + len(hidden_dims)
     self.dtype = dtype
     self.params = {}
+    for i in range(np.size(hidden_dims)):
+        Wstr = 'W'
+        bstr = 'b'
+        Wstr += `i+1`
+        bstr += `i+1`
+        if i == 0:
+            self.params[Wstr] = weight_scale * np.random.randn(input_dim,hidden_dims[0])
+            self.params[bstr] = np.zeros((1,hidden_dims[0]))
+        elif i == np.size(hidden_dims)-1:
+            self.params[Wstr] = weight_scale * np.random.randn(hidden_dims[i],num_classes)
+            self.params[bstr] = np.zeros((1,num_classes))
+        else:
+            self.params[Wstr] = weight_scale * np.random.randn(hidden_dims[i-1],hidden_dims[i])
+            self.params[bstr] = np.zeros((1,hidden_dims[i]))
+        
 
+        
     ############################################################################
     # TODO: Initialize the parameters of the network, storing all values in    #
     # the self.params dictionary. Store weights and biases for the first layer #
@@ -197,7 +236,8 @@ class FullyConnectedNet(object):
     """
     X = X.astype(self.dtype)
     mode = 'test' if y is None else 'train'
-
+    out = np.zeros(self.num_layers-1)
+    cache = np.zeros(self.num_layers-1)
     # Set train/test mode for batchnorm params and dropout param since they
     # behave differently during training and testing.
     if self.dropout_param is not None:
@@ -207,6 +247,24 @@ class FullyConnectedNet(object):
         bn_param[mode] = mode
 
     scores = None
+    forward = {}
+    for i in range(self.num_layers-1):
+        Wstr = 'W'
+        bstr = 'b'
+        Wstr += `i+1`
+        bstr += `i+1`
+        if i == 0:
+            out[i], cache[i] = affine_relu_forward(X, self.params[Wstr], self.params[bstr])
+        elif i== self.num_layers-2:
+            out[i], cache[i] = affine_forward(out[i-1], self.params[Wstr], self.params[bstr])
+        else:
+            out[i], cache[i] = affine_relu_forward(out[i-1], self.params[Wstr], self.params[bstr])
+            
+            
+    
+    scores = out[-1]
+    
+
     ############################################################################
     # TODO: Implement the forward pass for the fully-connected net, computing  #
     # the class scores for X and storing them in the scores variable.          #
