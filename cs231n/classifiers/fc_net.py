@@ -171,20 +171,21 @@ class FullyConnectedNet(object):
     self.num_layers = 1 + len(hidden_dims)
     self.dtype = dtype
     self.params = {}
-    for i in range(np.size(hidden_dims)):
+    for i in range(self.num_layers):
+        i += 1
         Wstr = 'W'
         bstr = 'b'
-        Wstr += `i+1`
-        bstr += `i+1`
-        if i == 0:
+        Wstr += `i`
+        bstr += `i`
+        if i == 1:
             self.params[Wstr] = weight_scale * np.random.randn(input_dim,hidden_dims[0])
             self.params[bstr] = np.zeros((1,hidden_dims[0]))
-        elif i == np.size(hidden_dims)-1:
-            self.params[Wstr] = weight_scale * np.random.randn(hidden_dims[i],num_classes)
+        elif i == self.num_layers:
+            self.params[Wstr] = weight_scale * np.random.randn(hidden_dims[-1],num_classes)
             self.params[bstr] = np.zeros((1,num_classes))
         else:
-            self.params[Wstr] = weight_scale * np.random.randn(hidden_dims[i-1],hidden_dims[i])
-            self.params[bstr] = np.zeros((1,hidden_dims[i]))
+            self.params[Wstr] = weight_scale * np.random.randn(hidden_dims[i-2],hidden_dims[i-1])
+            self.params[bstr] = np.zeros((1,hidden_dims[i-1]))
         
 
         
@@ -236,7 +237,7 @@ class FullyConnectedNet(object):
     """
     X = X.astype(self.dtype)
     mode = 'test' if y is None else 'train'
-    out = np.zeros(self.num_layers-1)
+    out = np.array(self.num_layers-1)
     cache = np.zeros(self.num_layers-1)
     # Set train/test mode for batchnorm params and dropout param since they
     # behave differently during training and testing.
@@ -247,23 +248,25 @@ class FullyConnectedNet(object):
         bn_param[mode] = mode
 
     scores = None
-    forward = {}
-    for i in range(self.num_layers-1):
+    catch = {}
+    for i in range(self.num_layers):
+        i += 1
         Wstr = 'W'
         bstr = 'b'
-        Wstr += `i+1`
-        bstr += `i+1`
-        if i == 0:
-            out[i], cache[i] = affine_relu_forward(X, self.params[Wstr], self.params[bstr])
-        elif i== self.num_layers-2:
-            out[i], cache[i] = affine_forward(out[i-1], self.params[Wstr], self.params[bstr])
+        Hstr = 'h'
+        Wstr += `i`
+        bstr += `i`
+        Hstr += `i`
+        if i == 1:
+            out, catch[Hstr] = affine_relu_forward(X, self.params[Wstr], self.params[bstr])
+        elif i== self.num_layers:
+            out, catch[Hstr] = affine_forward(out, self.params[Wstr], self.params[bstr])
         else:
-            out[i], cache[i] = affine_relu_forward(out[i-1], self.params[Wstr], self.params[bstr])
+            out, catch[Hstr] = affine_relu_forward(out, self.params[Wstr], self.params[bstr])
             
             
     
-    scores = out[-1]
-    
+    scores = out
 
     ############################################################################
     # TODO: Implement the forward pass for the fully-connected net, computing  #
@@ -287,6 +290,26 @@ class FullyConnectedNet(object):
       return scores
 
     loss, grads = 0.0, {}
+    loss, dx = softmax_loss(scores, y)
+    for i in reversed(range(self.num_layers)):
+        i += 1
+        Wstr = 'W'
+        bstr = 'b'
+        Hstr = 'h'
+        Wstr += `i`
+        bstr += `i`
+        Hstr += `i`
+        loss += 0.5 * self.reg * np.sum(self.params[Wstr] * self.params[Wstr]) 
+        if i == self.num_layers:
+            dout, dW, db = affine_backward(dx, catch[Hstr])
+            grads[bstr] = db
+            grads[Wstr] = dW + self.reg * self.params[Wstr]
+        else:
+            dout, dW, db = affine_relu_backward(dout, catch[Hstr])
+            grads[bstr] = db
+            grads[Wstr] = dW + self.reg * self.params[Wstr]
+        
+    ########################################
     ############################################################################
     # TODO: Implement the backward pass for the fully-connected net. Store the #
     # loss in the loss variable and gradients in the grads dictionary. Compute #
